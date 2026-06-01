@@ -1,3 +1,12 @@
+"""
+================================================================================
+🧠 Coder Agent — AI 程序员
+================================================================================
+
+职责：根据计划（plan）和调研资料（research_info）编写 Python 代码。
+要求输出纯代码，不带 Markdown 包裹。
+"""
+
 from langchain_openai import ChatOpenAI
 from core.config import settings
 
@@ -5,26 +14,28 @@ llm = ChatOpenAI(
     api_key=settings.API_KEY,
     base_url=settings.BASE_URL,
     model=settings.MODEL_NAME,
-    temperature=0.1
+    temperature=0.1     # 低温度，让代码更稳定、少出错
 )
 
 
 def code_node(state: dict):
-    print("\n[开发专员 Coder] 💻 正在根据计划和查阅的资料编写代码...")
+    """
+    被 LangGraph 工作流调用的入口函数。
+    输入：state["task"]、state["plan"]、state["research_info"]
+    输出：{"code": "..."} → 代码文本，传给 Executor
+    """
+    print("\n[Coder] Writing code based on plan and research...")
 
-    # 【核心修改】：把 research_info 塞给 Coder
-    prompt = f"""你是一个顶级的 Python 程序员。
+    prompt = f"""You are an expert Python developer.
 
-用户需求: {state["task"]}
-架构师的计划: {state["plan"]}
+User's Task: {state["task"]}
+Architect's Plan: {state["plan"]}
+Research Notes (with latest API info): {state.get("research_info", "No additional info")}
 
-【联网调研资料】(如果有报错重试，请参考这里的最新API):
-{state.get("research_info", "无附加资料")}
-
-请开始编写完整的 Python 代码。
-要求：
-1. 只输出纯 Python 代码，不要任何解释。
-2. 严禁使用 Markdown 代码块标记（不要用 ```python 或 ``` 包裹）。
+Write complete, runnable Python code.
+Requirements:
+1. Output ONLY the raw Python code — no explanations.
+2. Do NOT wrap code in ```python or ``` markers.
 """
 
     response = llm.invoke(prompt)

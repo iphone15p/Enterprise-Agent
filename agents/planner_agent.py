@@ -1,3 +1,13 @@
+"""
+================================================================================
+🧠 Planner Agent — AI 项目经理
+================================================================================
+
+职责：分析用户任务，判断是简单问答还是复杂工程任务。
+- 简单任务 → 返回 "SIMPLE_QUERY"，后续走快速通道
+- 复杂任务 → 输出分步执行计划，交给 Researcher 去调研
+"""
+
 from langchain_openai import ChatOpenAI
 from core.config import settings
 
@@ -5,14 +15,15 @@ llm = ChatOpenAI(
     api_key=settings.API_KEY,
     base_url=settings.BASE_URL,
     model=settings.MODEL_NAME,
-    temperature=0.7
+    temperature=0.7     # 较高温度，让规划更有创意
 )
 
 
 def plan_node(state: dict):
     """
-    AI Project Manager: analyzes the task and produces a step-by-step plan.
-    For simple queries, returns a directive to skip the coding pipeline.
+    被 LangGraph 工作流调用的入口函数。
+    输入：state["task"]  = 用户原始输入
+    输出：{"plan": "..."} → 写入共享 state，传递给 Researcher
     """
     task = state.get("task", "")
     history_info = state.get("research_info", "")

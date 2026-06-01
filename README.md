@@ -1,6 +1,6 @@
-# Enterprise AI Agent System
+# 🧠 AI 智能体协作平台 (AI Agent Collaboration Platform)
 
-A multi-agent AI system built with **LangGraph** and **FastAPI**, featuring a four-agent collaborative pipeline for intelligent task processing.
+基于 **LangGraph + FastAPI** 的多智能体协作系统，四位 AI Agent 接力完成从规划到编码的全流程任务。
 
 ## Architecture
 
