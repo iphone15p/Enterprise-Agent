@@ -95,11 +95,15 @@ def router_judge(state: AgentState) -> Literal["chat_rag", "planner"]:
     response = chain.invoke({"input": task})
     decision = response.content.strip().lower()
 
+    print(f"\n{'='*60}")
+    print(f"[Router] 📍 用户输入: {task[:80]}...")
+    print(f"[Router] 🧠 LLM 路由判断: {decision}")
+
     if "planner" in decision:
-        print("[Router] -> 多Agent管线（规划→调研→编码→审查）")
+        print(f"[Router] ➡️  进入多Agent管线（规划→调研→编码→审查）")
         return "planner"
     else:
-        print("[Router] -> 简单问答/查文档")
+        print(f"[Router] ➡️  进入简单通道（RAG查文档 / 联网搜索 / 自由对话）")
         return "chat_rag"
 
 
@@ -113,10 +117,14 @@ def chat_rag_node(state: AgentState) -> dict:
     3. 网络也没结果 → LLM 凭自身知识直接回答
     """
     task = state["task"]
+    print(f"\n[ChatRAG] 📍 收到问题: {task[:80]}...")
+    print(f"[ChatRAG] 🔍 第一步：查本地知识库...")
     rag_result = search_knowledge_base(task)
+    print(f"[ChatRAG] RAG检索结果: {'命中' if '未找到' not in rag_result else '未命中'}（{len(rag_result)}字符）")
 
     if "未找到" not in rag_result and "no relevant" not in rag_result.lower():
         # RAG 命中 → 基于文档回答
+        print(f"[ChatRAG] ✅ RAG命中，基于内部文档生成回答...")
         prompt = ChatPromptTemplate.from_messages([
             ("system", "你是极客科技的企业 AI 助手。请根据检索到的内部文档回答用户问题。"
                        "使用 Markdown 格式排版，加粗关键词，用列表组织内容。"),
@@ -126,12 +134,13 @@ def chat_rag_node(state: AgentState) -> dict:
         response = chain.invoke({"rag_result": rag_result, "input": task})
     else:
         # RAG 未命中 → 尝试联网搜索（DuckDuckGo，速度快）
+        print(f"[ChatRAG] ❌ RAG未命中，第二步：联网搜索（DuckDuckGo）...")
         web_success = False
         try:
-            print(f"      -> [ChatRAG] 文档未命中，尝试联网搜索...")
             web_result = search_web(task)
             if web_result and len(str(web_result)) > 20:
                 web_success = True
+                print(f"[ChatRAG] ✅ 联网搜索成功（{len(str(web_result))}字符）")
                 prompt = ChatPromptTemplate.from_messages([
                     ("system", "你是一个专业的 AI 助手。请根据联网搜索结果回答用户问题。"
                                "使用 Markdown 格式。尽量注明信息来源。"),
@@ -144,6 +153,7 @@ def chat_rag_node(state: AgentState) -> dict:
 
         if not web_success:
             # 联网也失败 → LLM 凭自身知识回答
+            print(f"[ChatRAG] ❌ 联网也失败，第三步：LLM 裸答...")
             prompt = ChatPromptTemplate.from_messages([
                 ("system", "你是一个友好专业的企业 AI 助手，请简洁地回答用户的问题。"),
                 ("user", "{input}")

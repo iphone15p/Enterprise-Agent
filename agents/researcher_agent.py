@@ -89,13 +89,18 @@ def research_node(state: dict):
 """
 
     # 第一轮：让 LLM 决定用什么工具
+    print(f"\n{'='*60}")
+    print(f"[Researcher] 🧠 LLM 正在决定使用哪个搜索工具...")
+    print(f"[Researcher] 用户需求: {task[:100]}...")
     msg = llm_with_tools.invoke(prompt)
 
     if msg.tool_calls:
         # 获取第一个工具调用的信息（LangChain 格式）
         tool_name = msg.tool_calls[0]["name"]
         args_dict = msg.tool_calls[0]["args"]
-        print(f"      -> [Researcher] 调用工具: {tool_name}，参数: {args_dict}")
+        print(f"[Researcher] ✅ LLM 决定调用: {tool_name}")
+        print(f"[Researcher] 搜索关键词: {args_dict}")
+        print(f"[Researcher] ⏳ 正在执行搜索，请稍候...")
 
         # 根据工具名称分发调用
         if tool_name == "search_internal_docs":
@@ -107,7 +112,11 @@ def research_node(state: dict):
         else:
             tool_result = search_web.invoke(args_dict)
 
-        print(f"      -> [Researcher] 搜索结果预览: {str(tool_result)[:200]}...")
+        print(f"[Researcher] ✅ 搜索完成！")
+        print(f"[Researcher] 原始搜索结果（完整内容，共 {len(str(tool_result))} 字符）:")
+        print(f"{'─'*60}")
+        print(tool_result)
+        print(f"{'─'*60}")
 
         # 第二轮：让 LLM 把原始资料整理成结构化报告
         final_prompt = f"""
