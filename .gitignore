@@ -16,6 +16,9 @@ workspace/
 data/
 temp_execution.py
 
-# 6. AI 生成的代码输出
-generated_code/*.html
+# 6. AI 生成的代码输出（DP: 不推远程，仅本地保留）
+generated_code/
+
+# 7. 其他临时文件
+*.html
 !frontend/index.html
