@@ -212,23 +212,47 @@ def _run_bilibili_rpa_in_thread(keyword: str, result_container: list):
                             if h3.count() > 0:
                                 title = h3.first.text_content()
 
-                        # --- 挖 UP 主/主播 ---
+                        # --- 挖 UP 主/主播（多策略兜底）---
                         up_name = ""
-                        up_loc = card.locator("[class*='author'], [class*='uname'], [class*='up-name vip'], [class*='bili-video-card__info--author']")
-                        if up_loc.count() > 0:
-                            up_name = up_loc.first.text_content()
-                        else:
-                            # 没标签就顺藤摸瓜找主页链接
-                            links = card.locator("a[href*='space.bilibili.com'], a[href*='live.bilibili.com']， [class*='up-name']").all()
-                            if links:
-                                up_name = links[-1].text_content()
+                        # 策略1：精确选择器
+                        for sel in [
+                            "span.bili-video-card__info--author",
+                            "a.up-name",
+                            "a[class*='up-name']",
+                            "span[class*='up-name']",
+                            "[class*='bili-video-card__info--author']",
+                            "[class*='author']",
+                            "[class*='uname']",
+                        ]:
+                            loc = card.locator(sel)
+                            if loc.count() > 0:
+                                raw = loc.first.text_content().strip()
+                                if raw and len(raw) > 1:
+                                    up_name = raw
+                                    break
+                        # 策略2：遍历所有链接，找UP主主页
+                        if not up_name:
+                            all_links = card.locator("a").all()
+                            for link in all_links:
+                                try:
+                                    href = link.get_attribute("href") or ""
+                                    text = link.text_content().strip()
+                                    if "space.bilibili.com" in href and text and len(text) > 1:
+                                        up_name = text
+                                        break
+                                except Exception:
+                                    continue
 
                         # --- 数据清洗 ---
                         title = title.replace("\n", " ").strip() if title else "未知"
                         if up_name:
-                            up_name = up_name.replace("\n", "").replace("UP", "").replace("·", "").strip()
-                        else:
-                            up_name = "未知"
+                            # 去除常见噪音字符
+                            up_name = up_name.replace("\n", "").strip()
+                            for noise in ["UP", "·", "•", "关注", "投稿", "粉丝"]:
+                                up_name = up_name.replace(noise, "")
+                            up_name = up_name.strip()
+                        if not up_name or len(up_name) <= 1:
+                            up_name = "（UP主信息未获取到）"
 
                         if title == "未知" and up_name == "未知":
                             continue

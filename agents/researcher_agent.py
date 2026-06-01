@@ -62,31 +62,44 @@ def research_node(state: dict):
     plan = state.get("plan", "")
     history_info = state.get("research_info", "")
 
-    prompt = f"""
+    # 判断任务类型：简单问答/搜索（必须搜） vs 编码任务（搜不搜看情况）
+    is_simple = "无需编码" in plan or "SIMPLE_QUERY" in plan
+
+    if is_simple:
+        # 简单问答/搜索类 → 必须搜索，获取最新信息
+        prompt = f"""
 你是"极客科技"的专属 AI 情报分析师。
 
-【历史上下文】：
-{history_info if history_info else "暂无"}
+【用户需求】：
+{task}
 
-【项目计划（仅供参考，不可盲从）】：
+🚨 工具选择规则（必须严格遵守）：
+
+1. 中文新闻、实时热点、国内动态 → 调用 `search_baidu`
+2. 视频、直播、游戏攻略、UP主 → 调用 `search_bilibili`
+3. 公司内部规定、迟到惩罚、福利 → 调用 `search_internal_docs`
+4. 纯英文问题或以上工具都失败 → 用 `search_web` 兜底
+
+⚠️ 死命令：必须先搜再回答，严禁凭自己的知识直接回答！
+"""
+    else:
+        # 编码任务 → 搜不搜让 LLM 自己判断，不强制
+        prompt = f"""
+你是"极客科技"的专属 AI 情报分析师。
+
+【项目计划】：
 {plan}
 
 【用户需求】：
 {task}
 
-🚨 工具选择规则（必须严格遵守，违者将被系统格式化）：
+根据计划判断是否需要搜索：
+- 如果计划中需要最新 API 文档、技术资料 → 调用相应工具搜索
+- 如果只是纯算法/逻辑代码（如"写个斐波那契函数"）→ 可以不搜，直接回答
 
-1. 用户问的是【中文新闻、实时热点、国内动态、最新消息】→ 必须调用 `search_baidu`！
-   百度是唯一能获取中文实时信息的工具，不要用其他工具替代。
-
-2. 用户问的是【视频、直播、游戏攻略、UP主】→ 调用 `search_bilibili`。
-
-3. 用户问的是【公司内部规定、迟到惩罚、福利、老板、密码】→ 调用 `search_internal_docs`。
-
-4. 只有【纯英文问题或以上工具都失败时】，才用 `search_web` (DuckDuckGo) 兜底。
-
-⚠️ 死命令：必须先调用搜索工具拿到真实资料，再回答。严禁凭自己的知识直接回答！
+可用工具：search_baidu(中文)、search_bilibili(视频)、search_internal_docs(内部文档)、search_web(通用)
 """
+
 
     # 第一轮：让 LLM 决定用什么工具
     print(f"\n{'='*60}")
