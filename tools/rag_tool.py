@@ -25,14 +25,14 @@ def build_or_load_vector_db():
     )
 
     if os.path.exists(PERSIST_DIRECTORY):
-        print("📦 [RAG 引擎] 发现本地知识库缓存，正在极速加载...")
+        print("[RAG] Loading cached vector database...")
         vectordb = Chroma(persist_directory=PERSIST_DIRECTORY, embedding_function=embeddings)
     else:
-        print("🔨 [RAG 引擎] 未发现本地数据库，正在读取机密文件并构建知识库...")
+        print("[RAG] No database found, building knowledge base from documents...")
 
         # 确保文件存在
         if not os.path.exists(DOC_PATH):
-            raise FileNotFoundError(f"🚨 找不到机密文件，请确保 {DOC_PATH} 存在！")
+            raise FileNotFoundError(f"Document file not found: {DOC_PATH}")
 
         # 第 1 步：读取文件
         loader = TextLoader(DOC_PATH, encoding="utf-8")
@@ -48,7 +48,7 @@ def build_or_load_vector_db():
             embedding=embeddings,
             persist_directory=PERSIST_DIRECTORY
         )
-        print("✅ [RAG 引擎] 私有知识库构建完成！")
+        print("[RAG] Knowledge base built successfully.")
 
     return vectordb
 
@@ -62,7 +62,7 @@ def search_knowledge_base(query: str) -> str:
     暴露给 Agent 调用的终极武器工具。
     接收问题，去向量数据库中寻找答案。
     """
-    print(f"   -> 🔍 [内部检索库] 正在机密档案中搜索: {query}")
+    print(f"   -> [RAG Search] Querying: {query}")
 
     # 执行相似度搜索，提取最相关的 3 个文档片段
     docs = vector_db.similarity_search(query, k=3)

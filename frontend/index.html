@@ -22,11 +22,11 @@
     <aside class="w-64 bg-gray-950 border-r border-gray-800 flex flex-col justify-between flex-shrink-0">
         <div class="p-3 flex flex-col gap-4 overflow-hidden h-full">
             <button onclick="createNewSession()" class="w-full border border-gray-700 hover:border-blue-500 hover:bg-gray-900 text-sm font-medium py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95">
-                <span>➕</span> 新建对话
+                <span>+</span> New Session
             </button>
             <div class="flex-1 overflow-y-auto flex flex-col gap-1 pr-1" id="session-list"></div>
         </div>
-        <div class="p-4 border-t border-gray-800 bg-gray-950/50 text-xs text-gray-500 text-center">🔒 核心机密数据已保密</div>
+        <div class="p-4 border-t border-gray-800 bg-gray-950/50 text-xs text-gray-500 text-center">GeekTech AI Core</div>
     </aside>
 
     <section class="flex-1 flex flex-col justify-between bg-gray-900 relative">
@@ -34,12 +34,12 @@
             <div class="flex items-center gap-3">
                 <div class="text-xl">🤖</div>
                 <div>
-                    <h1 class="text-base font-bold tracking-wide" id="current-title">极客科技 AI 核心中枢</h1>
-                    <p class="text-xs text-gray-400">数据状态：持久化分布式存储</p>
+                    <h1 class="text-base font-bold tracking-wide" id="current-title">GeekTech AI Core Hub</h1>
+                    <p class="text-xs text-gray-400">Multi-Agent System — Planner → Researcher → Coder → Reviewer</p>
                 </div>
             </div>
             <div class="text-xs text-blue-400 bg-blue-400/10 border border-blue-400/20 px-3 py-1 rounded-full flex items-center gap-2">
-                <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Database Connected
+                <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Online
             </div>
         </header>
 
@@ -47,8 +47,8 @@
 
         <footer class="p-4 bg-gradient-to-t from-gray-900 via-gray-900 to-transparent">
             <div class="max-w-4xl mx-auto flex gap-3">
-                <input type="text" id="user-input" class="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-5 py-4 text-gray-100 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 transition-all placeholder-gray-500" placeholder="问点什么..." autocomplete="off" onkeypress="if(event.key === 'Enter') sendMessage()">
-                <button id="send-btn" onclick="sendMessage()" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-4 rounded-xl font-bold text-sm tracking-wider transition-all active:scale-95 flex items-center shadow-lg shadow-blue-600/20">发送</button>
+                <input type="text" id="user-input" class="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-5 py-4 text-gray-100 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 transition-all placeholder-gray-500" placeholder="Ask anything..." autocomplete="off" onkeypress="if(event.key === 'Enter') sendMessage()">
+                <button id="send-btn" onclick="sendMessage()" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-4 rounded-xl font-bold text-sm tracking-wider transition-all active:scale-95 flex items-center shadow-lg shadow-blue-600/20">Send</button>
             </div>
         </footer>
     </section>
@@ -62,7 +62,9 @@
         let currentThreadId = "";
         let sessions = JSON.parse(localStorage.getItem('ai_sessions')) || [];
         let htmlRenderCache = {};
-        let typewriterTimer = null; // 🌟 核心：打字机全局刹车闸
+        let typewriterTimer = null;
+
+        const AUTH_TOKEN = "demo_token";
 
         window.onload = function() {
             if (sessions.length === 0) { createNewSession(); }
@@ -70,9 +72,9 @@
         };
 
         function createNewSession() {
-            if (typewriterTimer) clearInterval(typewriterTimer); // 切换前杀掉打字机
+            if (typewriterTimer) clearInterval(typewriterTimer);
             const id = "thread_" + Math.random().toString(36).substring(2, 9);
-            const newSession = { id: id, title: "新对话 " + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
+            const newSession = { id: id, title: "New Chat " + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
             sessions.unshift(newSession);
             saveSessions();
             currentThreadId = id;
@@ -92,7 +94,7 @@
                     <div class="flex items-center gap-2 truncate flex-1" onclick="switchSession('${s.id}')">
                         <span>💬</span> <span class="truncate">${s.title}</span>
                     </div>
-                    <span onclick="deleteSession('${s.id}', event)" class="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-1 transition-all">✕</span>
+                    <span onclick="deleteSession('${s.id}', event)" class="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 px-1 transition-all">&times;</span>
                 `;
                 sessionListContainer.appendChild(btn);
             });
@@ -100,16 +102,13 @@
 
         function switchSession(id) {
             if (id === currentThreadId) return;
-            if (typewriterTimer) clearInterval(typewriterTimer); // 🌟 核心：切换时瞬间掐断正在运行的打字机，绝不卡顿
-
+            if (typewriterTimer) clearInterval(typewriterTimer);
             currentThreadId = id;
             document.querySelectorAll('#session-list button').forEach(b => b.className = "w-full text-left text-sm py-3 px-4 rounded-xl flex items-center justify-between transition-all group text-gray-400 hover:bg-gray-900/50 hover:text-gray-200");
             const activeBtn = document.getElementById(`session-btn-${id}`);
             if (activeBtn) activeBtn.className = "w-full text-left text-sm py-3 px-4 rounded-xl flex items-center justify-between transition-all group bg-gray-800 text-blue-400 font-medium border border-gray-700";
-
             const session = sessions.find(s => s.id === id);
-            document.getElementById('current-title').innerText = session ? session.title : "极客科技 AI 核心中枢";
-
+            document.getElementById('current-title').innerText = session ? session.title : "GeekTech AI Core Hub";
             loadChatHistoryFromServer(id);
         }
 
@@ -132,21 +131,19 @@
                 scrollToBottom();
                 return;
             }
-
             clearChatWindow();
             showLoadingIndicator();
             try {
                 const response = await fetch(`/get_chat_history?thread_id=${id}`);
                 const data = await response.json();
                 clearChatWindow();
-
                 if (data.history && data.history.length > 0) {
                     let htmlBuffer = "";
                     data.history.forEach(msg => {
                         if (msg.role === "user") {
-                            htmlBuffer += `<div class="flex gap-4 flex-row-reverse"><div class="w-9 h-9 rounded-lg bg-indigo-500 flex-shrink-0 flex items-center justify-center text-sm shadow-md">👤</div><div class="bg-indigo-600 p-4 rounded-xl rounded-tr-none text-sm text-white max-w-[75%] break-words shadow-sm">${msg.content}</div></div>`;
+                            htmlBuffer += `<div class="flex gap-4 flex-row-reverse"><div class="w-9 h-9 rounded-lg bg-indigo-500 flex-shrink-0 flex items-center justify-center text-sm shadow-md">U</div><div class="bg-indigo-600 p-4 rounded-xl rounded-tr-none text-sm text-white max-w-[75%] break-words shadow-sm">${msg.content}</div></div>`;
                         } else {
-                            htmlBuffer += `<div class="flex gap-4"><div class="w-9 h-9 rounded-lg bg-blue-600 flex-shrink-0 flex items-center justify-center text-sm shadow-md">🤖</div><div class="bg-gray-800 p-4 rounded-xl rounded-tl-none border border-gray-800 text-sm text-gray-200 max-w-[85%] w-full shadow-sm"><div class="markdown-body">${DOMPurify.sanitize(marked.parse(msg.content))}</div></div></div>`;
+                            htmlBuffer += `<div class="flex gap-4"><div class="w-9 h-9 rounded-lg bg-blue-600 flex-shrink-0 flex items-center justify-center text-sm shadow-md">AI</div><div class="bg-gray-800 p-4 rounded-xl rounded-tl-none border border-gray-800 text-sm text-gray-200 max-w-[85%] w-full shadow-sm"><div class="markdown-body">${DOMPurify.sanitize(marked.parse(msg.content))}</div></div></div>`;
                         }
                     });
                     chatContainer.innerHTML = htmlBuffer;
@@ -154,25 +151,20 @@
                     scrollToBottom();
                 } else { showWelcomeMessage(); }
             } catch (error) {
-                chatContainer.innerHTML = `<div class="text-center text-red-400 text-sm py-8">🚨 历史记录同步失败</div>`;
+                chatContainer.innerHTML = `<div class="text-center text-red-400 text-sm py-8">Failed to load history</div>`;
             }
         }
 
-        // 🌟 核心升级：防卡死、超顺滑打字机引擎
         function startStreamingTypewriter(element, fullText, targetSessionId) {
             if (typewriterTimer) clearInterval(typewriterTimer);
             let charIndex = 0;
             element.classList.add('typing-indicator');
-
             typewriterTimer = setInterval(() => {
-                // 如果用户在中途切走了，立马收工自毁，防止串位和卡顿
                 if (targetSessionId !== currentThreadId) {
                     clearInterval(typewriterTimer);
                     return;
                 }
-
                 if (charIndex <= fullText.length) {
-                    // 每次吐 3 个字符，速度极快且极具流式动态感
                     const textSlice = fullText.substring(0, charIndex);
                     element.innerHTML = DOMPurify.sanitize(marked.parse(textSlice));
                     scrollToBottom();
@@ -180,9 +172,9 @@
                 } else {
                     clearInterval(typewriterTimer);
                     element.classList.remove('typing-indicator');
-                    htmlRenderCache[currentThreadId] = chatContainer.innerHTML; // 结束后稳稳写入缓存
+                    htmlRenderCache[currentThreadId] = chatContainer.innerHTML;
                 }
-            }, 15); // 每 15 毫秒高频吐字
+            }, 15);
         }
 
         async function sendMessage() {
@@ -190,11 +182,15 @@
             if (!text) return;
 
             const currentSession = sessions.find(s => s.id === currentThreadId);
-            if (currentSession && currentSession.title.startsWith("新对话")) { updateSessionTitle(currentThreadId, text); }
+            if (currentSession && currentSession.title.startsWith("New Chat")) {
+                currentSession.title = text.length > 15 ? text.substring(0, 15) + "..." : text;
+                saveSessions();
+                renderSessionList();
+                if (currentThreadId === currentSession.id) document.getElementById('current-title').innerText = currentSession.title;
+            }
 
             appendUserMessage(text);
             htmlRenderCache[currentThreadId] = chatContainer.innerHTML;
-
             userInput.value = '';
             setUIState(true);
 
@@ -202,27 +198,55 @@
             contentBox.innerHTML = "";
 
             try {
-                const encodedTask = encodeURIComponent(text);
-                const eventSource = new EventSource(`/run_agent?task=${encodedTask}&token=dq67_nb_888&thread_id=${currentThreadId}`);
+                const response = await fetch('/run_agent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        task: text,
+                        token: AUTH_TOKEN,
+                        thread_id: currentThreadId
+                    })
+                });
 
-                eventSource.onmessage = function(event) {
-                    try {
-                        const data = JSON.parse(event.data);
-                        for (const nodeName in data) {
-                            if (data[nodeName].research_info) {
-                                // 🌟 激活全新流式打字机
-                                startStreamingTypewriter(contentBox, data[nodeName].research_info, currentThreadId);
-                            }
-                        }
-                    } catch (e) { console.error(e); }
-                };
-
-                eventSource.onerror = function() {
-                    eventSource.close();
+                if (!response.ok) {
+                    contentBox.innerHTML = `Error: ${response.status} ${response.statusText}`;
                     setUIState(false);
-                };
+                    return;
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const dataStr = line.substring(6);
+                            if (dataStr === '[DONE]') {
+                                setUIState(false);
+                                return;
+                            }
+                            try {
+                                const data = JSON.parse(dataStr);
+                                for (const nodeName in data) {
+                                    if (data[nodeName].research_info) {
+                                        startStreamingTypewriter(contentBox, data[nodeName].research_info, currentThreadId);
+                                    }
+                                }
+                            } catch (e) { /* partial chunk, ignore */ }
+                        }
+                    }
+                }
+                setUIState(false);
             } catch (error) {
-                contentBox.innerHTML = "🚨 连接断开。";
+                contentBox.innerHTML = "Connection error.";
                 setUIState(false);
             }
         }
@@ -230,7 +254,7 @@
         function appendUserMessage(text) {
             const div = document.createElement('div');
             div.className = 'flex gap-4 flex-row-reverse';
-            div.innerHTML = `<div class="w-9 h-9 rounded-lg bg-indigo-500 flex-shrink-0 flex items-center justify-center text-sm shadow-md">👤</div><div class="bg-indigo-600 p-4 rounded-xl rounded-tr-none text-sm text-white max-w-[75%] break-words shadow-sm">${text}</div>`;
+            div.innerHTML = `<div class="w-9 h-9 rounded-lg bg-indigo-500 flex-shrink-0 flex items-center justify-center text-sm shadow-md">U</div><div class="bg-indigo-600 p-4 rounded-xl rounded-tr-none text-sm text-white max-w-[75%] break-words shadow-sm">${text}</div>`;
             chatContainer.appendChild(div);
             scrollToBottom();
         }
@@ -238,27 +262,17 @@
         function createAIMessageContainer() {
             const div = document.createElement('div');
             div.className = 'flex gap-4';
-            div.innerHTML = `<div class="w-9 h-9 rounded-lg bg-blue-600 flex-shrink-0 flex items-center justify-center text-sm shadow-md">🤖</div><div class="bg-gray-800 p-4 rounded-xl rounded-tl-none border border-gray-800 text-sm text-gray-200 max-w-[85%] w-full shadow-sm"><div class="markdown-body typing-indicator">思考中，正在检索中枢大数据库...</div></div>`;
+            div.innerHTML = `<div class="w-9 h-9 rounded-lg bg-blue-600 flex-shrink-0 flex items-center justify-center text-sm shadow-md">AI</div><div class="bg-gray-800 p-4 rounded-xl rounded-tl-none border border-gray-800 text-sm text-gray-200 max-w-[85%] w-full shadow-sm"><div class="markdown-body typing-indicator">Thinking...</div></div>`;
             chatContainer.appendChild(div);
             scrollToBottom();
             return div.querySelector('.markdown-body');
         }
 
-        function updateSessionTitle(id, text) {
-            const session = sessions.find(s => s.id === id);
-            if (session) {
-                session.title = text.length > 10 ? text.substring(0, 10) + "..." : text;
-                saveSessions();
-                renderSessionList();
-                if(id === currentThreadId) document.getElementById('current-title').innerText = session.title;
-            }
-        }
-
         function saveSessions() { localStorage.setItem('ai_sessions', JSON.stringify(sessions)); }
         function clearChatWindow() { chatContainer.innerHTML = ""; }
         function scrollToBottom() { chatContainer.scrollTop = chatContainer.scrollHeight; }
-        function showLoadingIndicator() { chatContainer.innerHTML = `<div class="text-center text-gray-500 text-sm py-8 typing-indicator">📂 正在调取历史账本...</div>`; }
-        function showWelcomeMessage() { chatContainer.innerHTML = `<div class="flex gap-4"><div class="w-9 h-9 rounded-lg bg-blue-600 flex-shrink-0 flex items-center justify-center text-sm">🤖</div><div class="bg-gray-800 p-4 rounded-xl rounded-tl-none border border-gray-800 text-sm text-gray-200 shadow-sm">欢迎回到极客科技。持久化历史记录已就绪，左侧会话已激活，请发送您的指令。</div></div>`; }
+        function showLoadingIndicator() { chatContainer.innerHTML = `<div class="text-center text-gray-500 text-sm py-8 typing-indicator">Loading history...</div>`; }
+        function showWelcomeMessage() { chatContainer.innerHTML = `<div class="flex gap-4"><div class="w-9 h-9 rounded-lg bg-blue-600 flex-shrink-0 flex items-center justify-center text-sm">AI</div><div class="bg-gray-800 p-4 rounded-xl rounded-tl-none border border-gray-800 text-sm text-gray-200 shadow-sm">Welcome to GeekTech AI Core. Multi-Agent System ready. Send your request to begin.</div></div>`; }
         function setUIState(disabled) {
             userInput.disabled = disabled;
             sendBtn.disabled = disabled;

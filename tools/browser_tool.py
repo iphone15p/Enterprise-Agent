@@ -22,7 +22,7 @@ def _run_baidu_rpa_in_thread(keyword: str, result_container: list):
     try:
         print(f"\n🤖 [百度机械臂] 准备前往百度搜索：{keyword}...")
         with sync_playwright() as p:
-            browser = p.chromium.launch(channel="msedge", headless=False, slow_mo=50)
+            browser = p.chromium.launch(headless=True)
 
             # 穿上伪装外套，假装自己是真人的 Windows 电脑
             context = browser.new_context(
@@ -150,7 +150,7 @@ def _run_bilibili_rpa_in_thread(keyword: str, result_container: list):
     try:
         print(f"\n🤖 [B站机械臂] 收到指令！准备前往 B站 搜索：{keyword}...")
         with sync_playwright() as p:
-            browser = p.chromium.launch(channel="msedge", headless=False, slow_mo=50)
+            browser = p.chromium.launch(headless=True)
 
             # 给 B 站也穿上真人的伪装外套！
             context = browser.new_context(

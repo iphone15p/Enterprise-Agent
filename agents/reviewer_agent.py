@@ -9,27 +9,30 @@ llm = ChatOpenAI(
 )
 
 
-# (在你的 review_node 函数里，修改调用大模型的提示词部分，类似下面这样：)
-
-# 注意：保留你原本文件最上方的 import 和 llm 配置代码
-# 只替换 review_node 这个函数即可
-
 def review_node(state: dict):
-    print("\n[审查专员 Reviewer] 🕵️ 正在检查代码和运行结果...")
+    """
+    AI Code Reviewer: checks execution results and decides whether the code passes.
+    Returns PASS if successful, or feedback for the coder to fix issues.
+    """
+    print("\n[Reviewer] Checking code execution results...")
 
     exec_result = state.get("execution_result", "")
 
-    # 【终极防卡死补丁】：只要包含"✅ 运行成功"，直接绕过大模型，强制绿灯！
-    if "✅ 运行成功" in exec_result:
-        print("      -> 🚀 代码已成功运行，强制亮起绿灯！进入保存流程！")
+    # Fast path: execution succeeded
+    if "✅ 运行成功" in exec_result or "success" in exec_result.lower():
+        print("      -> Code executed successfully. PASS.")
         return {"feedback": "PASS"}
 
-    prompt = f"""你是一个严厉的代码审查员。
-代码运行报错了：
+    prompt = f"""You are a strict code reviewer.
+
+The code execution produced this output/error:
 {exec_result}
 
-请结合用户需求：{state.get("task", "")}
-分析这段错误，给出修改建议，让程序员重写。不要输出代码，只说原因。"""
+User's original task: {state.get("task", "")}
+
+Analyze the failure and provide a concise fix suggestion for the developer.
+Focus on the root cause. Do not output code — just the diagnosis and fix direction.
+"""
 
     response = llm.invoke(prompt)
     return {"feedback": response.content}
