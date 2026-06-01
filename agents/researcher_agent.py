@@ -118,8 +118,17 @@ def research_node(state: dict):
         print(tool_result)
         print(f"{'─'*60}")
 
-        # 第二轮：让 LLM 把原始资料整理成结构化报告
-        final_prompt = f"""
+        # 判断是否需要 LLM 二次整理（编码任务需要，简单查询跳过省时间）
+        is_simple = "无需编码" in plan or "SIMPLE_QUERY" in plan
+
+        if is_simple:
+            # 简单查询：跳过 LLM 总结，直接返回原始搜索结果（省 3~8 秒）
+            print(f"[Researcher] ⚡ 简单查询，跳过LLM总结，直接返回搜索结果！")
+            return {"research_info": tool_result}
+        else:
+            # 编码任务：让 LLM 整理成结构化报告，方便 Coder 理解
+            print(f"[Researcher] 📝 编码任务，LLM正在整理搜索结果...")
+            final_prompt = f"""
 你是极客科技的情报分析师。请根据以下搜索结果回答用户问题。
 
 搜索结果（你唯一的事实来源，严禁编造）：
@@ -133,8 +142,8 @@ def research_node(state: dict):
 3. 使用 Markdown 格式排版：用标题、加粗、列表让答案清晰易读。
 4. 尽量注明信息来源。
 """
-        final_msg = llm.invoke(final_prompt)
-        return {"research_info": final_msg.content}
+            final_msg = llm.invoke(final_prompt)
+            return {"research_info": final_msg.content}
 
     else:
         # LLM 认为不需要工具，但仍然要求它搜索（兜底）
