@@ -22,3 +22,7 @@ generated_code/
 # 7. 其他临时文件
 *.html
 !frontend/index.html
+
+# 8. 前端构建产物
+frontend/dist/
+frontend/node_modules/

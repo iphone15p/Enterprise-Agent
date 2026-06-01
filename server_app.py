@@ -71,11 +71,20 @@ class AgentRequest(BaseModel):
 
 
 # ==================== 路由 1：前端页面 ====================
+# DP: 优先返回 React 构建产物，没有则返回 Vite 开发入口
 
 @app.get("/")
 async def serve_frontend():
-    """返回前端 SPA 页面"""
-    return FileResponse("frontend/index.html")
+    """返回前端页面（React 构建版 或 Vite 开发版）"""
+    # 生产模式：React 已构建
+    dist_index = "frontend/dist/index.html"
+    if os.path.exists(dist_index):
+        return FileResponse(dist_index)
+    # 开发模式：Vite dev server 入口（需先 npm run dev）
+    vite_index = "frontend/index.html"
+    if os.path.exists(vite_index):
+        return FileResponse(vite_index)
+    return {"message": "前端文件未找到，请运行 cd frontend && npm run dev"}
 
 
 # ==================== 路由 2：运行 Agent（核心接口） ====================
