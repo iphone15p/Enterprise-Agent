@@ -5,17 +5,17 @@
 
 这是整个项目的「大脑」，负责：
 1. 路由判断：是简单问答还是复杂任务？
-2. 简单路径：直接调 LLM 或查 RAG 文档库
-3. 复杂路径：启动四 Agent 协作管线
+2. 简单路径：先查 RAG 文档库 → 没命中就联网搜 → 再不行 LLM 裸答
+3. 复杂路径：启动四 Agent 协作管线（规划→调研→编码→执行→审查）
 
 管线流程：
-    Router（路由判断）
+    Router（路由裁判）
        │
        ├─ 简单/闲聊 → Chat/RAG Node → END
        │
        └─ 复杂任务 → Planner（规划）
                         ↓
-                     Researcher（调研）
+                     Researcher（调研，调用百度/B站/DuckDuckGo/内部文档）
                         ↓
                      Coder（编码）
                         ↓
@@ -34,6 +34,7 @@ from langchain_openai import ChatOpenAI
 
 from core.config import settings
 from tools.rag_tool import search_knowledge_base
+from tools.search_tool import search_web   # DuckDuckGo 搜索，chat_rag 的兜底方案
 from agents.planner_agent import plan_node
 from agents.researcher_agent import research_node
 from agents.coder_agent import code_node
@@ -43,7 +44,7 @@ from tools.execute_tool import run_code_safely
 
 # ==================== 共享状态定义 ====================
 # 所有 Agent 节点共享同一个 state 字典（类似黑板/白板）
-# total=False 表示每个字段都是可选的，不需要所有节点都填
+# total=False 表示每个字段都是可选的
 
 class AgentState(TypedDict, total=False):
     task: str              # 用户原始输入
@@ -72,19 +73,21 @@ def router_judge(state: AgentState) -> Literal["chat_rag", "planner"]:
     """
     用大模型判断用户意图：
     - "chat_rag" → 简单问答/闲聊/查文档（走快速通道）
-    - "planner" → 复杂工程任务（走四 Agent 管线）
+    - "planner" → 需要搜索/查资料/写代码（走四 Agent 管线）
     """
     task = state["task"]
 
     prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are a precise routing classifier. Analyze the user's input:
+        ("system", """你是一个精准的路由分类器。分析用户的输入，只返回一个词：
 
-1. Return "chat_rag" if the user is: greeting, casual chat, simple Q&A,
-   asking about company policy/docs (e.g. "what's the late penalty?", "company benefits?").
-2. Return "planner" if the user is asking for: code development, software engineering,
-   complex multi-step tasks (e.g. "write a snake game", "build a web scraper").
+1. 仅当用户是【纯粹闲聊、问候、或询问公司内部规定】时，返回 chat_rag。
+   例如："你好"、"哈哈"、"迟到怎么罚？"、"公司福利有哪些？"
 
-Reply with ONLY one word: chat_rag or planner."""),
+2. 其他所有情况，包括【搜新闻、查资料、实时信息、写代码、开发项目】，
+   一律返回 planner。
+   例如："今天有什么科技新闻？"、"帮我写个爬虫"、"马斯克最新消息"
+
+只能返回一个词：chat_rag 或 planner，不要加任何标点或空格。"""),
         ("user", "{input}")
     ])
 
@@ -93,10 +96,10 @@ Reply with ONLY one word: chat_rag or planner."""),
     decision = response.content.strip().lower()
 
     if "planner" in decision:
-        print("[Router] -> Multi-Agent Pipeline (Planner → Researcher → Coder → Reviewer)")
+        print("[Router] -> 多Agent管线（规划→调研→编码→审查）")
         return "planner"
     else:
-        print("[Router] -> Simple Q&A / RAG")
+        print("[Router] -> 简单问答/查文档")
         return "chat_rag"
 
 
@@ -104,9 +107,10 @@ Reply with ONLY one word: chat_rag or planner."""),
 
 def chat_rag_node(state: AgentState) -> dict:
     """
-    处理不需要写代码的简单请求：
+    处理不需要写代码的简单请求（三层兜底）：
     1. 先查本地知识库（RAG），看看公司文档里有没有答案
-    2. 找不到就用 LLM 直接回答
+    2. RAG 没命中 → 联网搜索（DuckDuckGo）
+    3. 网络也没结果 → LLM 凭自身知识直接回答
     """
     task = state["task"]
     rag_result = search_knowledge_base(task)
@@ -114,21 +118,38 @@ def chat_rag_node(state: AgentState) -> dict:
     if "未找到" not in rag_result and "no relevant" not in rag_result.lower():
         # RAG 命中 → 基于文档回答
         prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are a professional enterprise AI assistant. Answer the user's question "
-                       "based on the retrieved internal documents. Use Markdown formatting."),
-            ("user", "Retrieved documents:\n{rag_result}\n\nUser question: {input}")
+            ("system", "你是极客科技的企业 AI 助手。请根据检索到的内部文档回答用户问题。"
+                       "使用 Markdown 格式排版，加粗关键词，用列表组织内容。"),
+            ("user", "内部文档检索结果：\n{rag_result}\n\n用户问题：{input}")
         ])
         chain = prompt | llm
         response = chain.invoke({"rag_result": rag_result, "input": task})
     else:
-        # RAG 未命中 → 自由对话
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are a friendly and professional enterprise AI assistant. "
-                       "Answer the user's question concisely."),
-            ("user", "{input}")
-        ])
-        chain = prompt | llm
-        response = chain.invoke({"input": task})
+        # RAG 未命中 → 尝试联网搜索（DuckDuckGo，速度快）
+        web_success = False
+        try:
+            print(f"      -> [ChatRAG] 文档未命中，尝试联网搜索...")
+            web_result = search_web(task)
+            if web_result and len(str(web_result)) > 20:
+                web_success = True
+                prompt = ChatPromptTemplate.from_messages([
+                    ("system", "你是一个专业的 AI 助手。请根据联网搜索结果回答用户问题。"
+                               "使用 Markdown 格式。尽量注明信息来源。"),
+                    ("user", "联网搜索结果：\n{web_result}\n\n用户问题：{input}")
+                ])
+                chain = prompt | llm
+                response = chain.invoke({"web_result": web_result, "input": task})
+        except Exception as e:
+            print(f"      -> [ChatRAG] 联网搜索失败: {e}")
+
+        if not web_success:
+            # 联网也失败 → LLM 凭自身知识回答
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", "你是一个友好专业的企业 AI 助手，请简洁地回答用户的问题。"),
+                ("user", "{input}")
+            ])
+            chain = prompt | llm
+            response = chain.invoke({"input": task})
 
     return {"research_info": response.content}
 
@@ -138,13 +159,13 @@ def chat_rag_node(state: AgentState) -> dict:
 def execute_node(state: AgentState) -> dict:
     """
     把 Coder 生成的代码扔进沙盒运行。
-    自动处理两个常见问题：
-    1. 剥离 Markdown 代码块标记（```python ... ```）
-    2. 递增重试计数器（防止无限循环）
+    自动处理两个问题：
+    1. 剥离 Markdown 代码块标记（```python ... ```）→ 避免 SyntaxError
+    2. 递增重试计数器 → 防止无限循环
     """
     code = state.get("code", "")
     if not code:
-        return {"execution_result": "Error: No code to execute."}
+        return {"execution_result": "错误：没有可执行的代码。"}
 
     # 自动剔除 ```python 和 ``` 包裹
     code = code.strip()
@@ -174,13 +195,13 @@ def review_decision(state: AgentState) -> Literal["code_node", "__end__"]:
     retry_count = state.get("retry_count", 0)
 
     if "PASS" in feedback:
-        print("[Reviewer] Code passed review. Done.")
+        print("[Reviewer] 代码审查通过，管线结束。")
         return "__end__"
     if retry_count >= 2:
-        print("[Reviewer] Max retries reached. Ending pipeline.")
+        print("[Reviewer] 已达最大重试次数，管线结束。")
         return "__end__"
 
-    print(f"[Reviewer] Revision needed (attempt {retry_count + 1}/2). Sending back to Coder.")
+    print(f"[Reviewer] 需要修改（第 {retry_count + 1}/2 次重试），打回 Coder。")
     return "code_node"
 
 
@@ -189,14 +210,14 @@ def review_decision(state: AgentState) -> Literal["code_node", "__end__"]:
 workflow = StateGraph(AgentState)
 
 # 注册所有节点
-workflow.add_node("chat_rag_node", chat_rag_node)        # 简单问答
+workflow.add_node("chat_rag_node", chat_rag_node)        # 简单问答 + RAG + 联网搜索
 workflow.add_node("plan_node", plan_node)                 # 规划 Agent
-workflow.add_node("research_node", research_node)         # 调研 Agent
+workflow.add_node("research_node", research_node)         # 调研 Agent（百度/B站/DuckDuckGo/内部文档）
 workflow.add_node("code_node", code_node)                 # 编码 Agent
 workflow.add_node("execute_node", execute_node)           # 沙盒执行
 workflow.add_node("review_node", review_node)             # 审查 Agent
 
-# 入口：路由裁判 → 分流到简单或复杂路径
+# 入口：路由裁判 → 分流
 workflow.set_conditional_entry_point(
     router_judge,
     {
@@ -214,7 +235,7 @@ workflow.add_edge("research_node", "code_node")
 workflow.add_edge("code_node", "execute_node")
 workflow.add_edge("execute_node", "review_node")
 
-# 审查后的条件跳转：通过→结束，未通过→重写
+# 审查后的条件跳转：通过→结束，未通过→打回重写
 workflow.add_conditional_edges(
     "review_node",
     review_decision,

@@ -4,7 +4,7 @@
 ================================================================================
 
 职责：分析用户任务，判断是简单问答还是复杂工程任务。
-- 简单任务 → 返回 "SIMPLE_QUERY"，后续走快速通道
+- 简单任务 → 返回 "SIMPLE_QUERY: 无需编码"
 - 复杂任务 → 输出分步执行计划，交给 Researcher 去调研
 """
 
@@ -29,20 +29,20 @@ def plan_node(state: dict):
     history_info = state.get("research_info", "")
 
     prompt = f"""
-You are a senior AI Project Manager.
+你是一个资深的 AI 项目经理。
 
-[Historical Context]:
-{history_info if history_info else "None"}
+【历史上下文】：
+{history_info if history_info else "无"}
 
-[User Task]:
+【用户任务】：
 {task}
 
-Rules:
-1. If the task is a simple question, lookup, or casual chat (e.g. "what's the late penalty?", "who is the CEO?"),
-   respond with exactly: "SIMPLE_QUERY: no code needed."
-2. If the task requires code development (e.g. "write a snake game", "build a web scraper"),
-   output a concise step-by-step plan.
-3. No greetings, no filler — be direct and actionable.
+执行规则：
+1. 如果任务只是简单的【问答、查资料、闲聊】（比如"迟到怎么罚"、"今天有什么新闻"），
+   请直接输出："SIMPLE_QUERY: 无需编码"
+2. 如果任务需要【编写代码、开发程序】（比如"写一个贪吃蛇"、"帮我写个爬虫"），
+   请输出简洁的分步执行计划。
+3. 禁止输出寒暄、反问或废话，直接给出判断结果。
 """
 
     response = llm.invoke(prompt)

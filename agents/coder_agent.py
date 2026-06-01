@@ -24,18 +24,19 @@ def code_node(state: dict):
     输入：state["task"]、state["plan"]、state["research_info"]
     输出：{"code": "..."} → 代码文本，传给 Executor
     """
-    print("\n[Coder] Writing code based on plan and research...")
+    print("\n[Coder] 正在根据计划和调研资料编写代码...")
 
-    prompt = f"""You are an expert Python developer.
+    prompt = f"""你是一个顶级的 Python 程序员。
 
-User's Task: {state["task"]}
-Architect's Plan: {state["plan"]}
-Research Notes (with latest API info): {state.get("research_info", "No additional info")}
+用户需求：{state["task"]}
+架构师计划：{state["plan"]}
+调研资料（含最新 API 信息）：{state.get("research_info", "无附加资料")}
 
-Write complete, runnable Python code.
-Requirements:
-1. Output ONLY the raw Python code — no explanations.
-2. Do NOT wrap code in ```python or ``` markers.
+请编写完整的、可直接运行的 Python 代码。
+
+要求：
+1. 只输出纯 Python 代码，不要任何解释文字。
+2. 严禁用 ```python 或 ``` 包裹代码，直接以代码本身开头。
 """
 
     response = llm.invoke(prompt)

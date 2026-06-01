@@ -25,25 +25,24 @@ def review_node(state: dict):
     输入：state["execution_result"]、state["task"]
     输出：{"feedback": "PASS"} 或 {"feedback": "错误分析..."}
     """
-    print("\n[Reviewer] Checking code execution results...")
+    print("\n[Reviewer] 正在检查代码执行结果...")
 
     exec_result = state.get("execution_result", "")
 
     # 快速通道：执行成功直接通过
     if "✅ 运行成功" in exec_result or "success" in exec_result.lower():
-        print("      -> Code executed successfully. PASS.")
+        print("      -> 代码执行成功，PASS！")
         return {"feedback": "PASS"}
 
     # 失败 → 分析根因，给出修复建议
-    prompt = f"""You are a strict code reviewer.
+    prompt = f"""你是一个严格的代码审查员。
 
-The code execution produced this output/error:
+代码运行结果/错误信息：
 {exec_result}
 
-User's original task: {state.get("task", "")}
+用户的原始需求：{state.get("task", "")}
 
-Analyze the failure and provide a concise fix suggestion for the developer.
-Focus on the root cause. Do not output code — just the diagnosis and fix direction.
+请分析失败的根本原因，给出修复方向。只输出诊断和建议，不要输出代码。
 """
 
     response = llm.invoke(prompt)

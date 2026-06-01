@@ -7,11 +7,11 @@
 拥有的工具（武器库）：
 - search_web()          → DuckDuckGo 全网搜索
 - search_internal_docs() → 本地 ChromaDB 知识库检索
-- search_baidu()        → Playwright 百度抓取
-- search_bilibili()     → Playwright B站抓取
+- search_baidu()        → Playwright 百度抓取（中文实时信息最强）
+- search_bilibili()     → Playwright B站抓取（视频/直播/游戏攻略）
 
 工作流程：
-1. LLM 收到任务和计划 → 决定用哪些工具
+1. LLM 收到任务和计划 → 决定用哪个工具
 2. 执行工具调用 → 获取原始资料
 3. LLM 整理资料 → 输出结构化报告给 Coder
 """
@@ -34,14 +34,14 @@ llm = ChatOpenAI(
 
 @tool
 def search_web(query: str) -> str:
-    """搜索互联网公开信息、实时新闻等（基于 DuckDuckGo）"""
+    """搜索互联网公开信息、实时新闻等（基于 DuckDuckGo，适合英文/通用搜索）"""
     search = DuckDuckGoSearchRun()
     return search.run(query)
 
 
 @tool
 def search_internal_docs(query: str) -> str:
-    """搜索极客科技内部机密文档（基于 ChromaDB 向量检索）"""
+    """搜索极客科技内部机密文档（基于 ChromaDB 向量检索，公司规定/福利/密码等）"""
     return search_knowledge_base(query)
 
 
@@ -63,22 +63,29 @@ def research_node(state: dict):
     history_info = state.get("research_info", "")
 
     prompt = f"""
-You are the AI Research Analyst for "GeekTech" (极客科技).
+你是"极客科技"的专属 AI 情报分析师。
 
-[Historical Context]:
-{history_info if history_info else "No prior context."}
+【历史上下文】：
+{history_info if history_info else "暂无"}
 
-[Project Plan]:
+【项目计划（仅供参考，不可盲从）】：
 {plan}
 
-[User's Request]:
+【用户需求】：
 {task}
 
-Rules:
-1. If the user mentions internal company topics (late penalty, benefits, CEO, passwords, internal projects),
-   you MUST call `search_internal_docs` first.
-2. For general knowledge or real-time info, use `search_web`, `search_baidu`, or `search_bilibili`.
-3. Never ask the user for clarification — act autonomously.
+🚨 工具选择规则（必须严格遵守，违者将被系统格式化）：
+
+1. 用户问的是【中文新闻、实时热点、国内动态、最新消息】→ 必须调用 `search_baidu`！
+   百度是唯一能获取中文实时信息的工具，不要用其他工具替代。
+
+2. 用户问的是【视频、直播、游戏攻略、UP主】→ 调用 `search_bilibili`。
+
+3. 用户问的是【公司内部规定、迟到惩罚、福利、老板、密码】→ 调用 `search_internal_docs`。
+
+4. 只有【纯英文问题或以上工具都失败时】，才用 `search_web` (DuckDuckGo) 兜底。
+
+⚠️ 死命令：必须先调用搜索工具拿到真实资料，再回答。严禁凭自己的知识直接回答！
 """
 
     # 第一轮：让 LLM 决定用什么工具
@@ -88,7 +95,7 @@ Rules:
         # 获取第一个工具调用的信息（LangChain 格式）
         tool_name = msg.tool_calls[0]["name"]
         args_dict = msg.tool_calls[0]["args"]
-        print(f"      -> [Researcher] Using tool: {tool_name}, args: {args_dict}")
+        print(f"      -> [Researcher] 调用工具: {tool_name}，参数: {args_dict}")
 
         # 根据工具名称分发调用
         if tool_name == "search_internal_docs":
@@ -100,26 +107,44 @@ Rules:
         else:
             tool_result = search_web.invoke(args_dict)
 
-        print(f"      -> [Researcher] Result preview: {tool_result[:200]}...")
+        print(f"      -> [Researcher] 搜索结果预览: {str(tool_result)[:200]}...")
 
-        # 第二轮：让 LLM 把查到的原始资料整理成结构化报告
+        # 第二轮：让 LLM 把原始资料整理成结构化报告
         final_prompt = f"""
-Based on the research results below, answer the user's request.
+你是极客科技的情报分析师。请根据以下搜索结果回答用户问题。
 
-Research Results (your ONLY factual source):
+搜索结果（你唯一的事实来源，严禁编造）：
 {tool_result}
 
-User Request: {task}
+用户问题：{task}
 
-Rules:
-1. Answer strictly based on the provided research — do not fabricate.
-2. If the research doesn't cover the answer, say so honestly.
-3. Use Markdown formatting with proper headings, bold, and lists where appropriate.
+要求：
+1. 严格基于搜索结果回答，不要自己编造任何信息。
+2. 如果搜索结果不包含答案，请诚实地说"搜索结果中未找到相关信息"。
+3. 使用 Markdown 格式排版：用标题、加粗、列表让答案清晰易读。
+4. 尽量注明信息来源。
 """
         final_msg = llm.invoke(final_prompt)
         return {"research_info": final_msg.content}
 
     else:
-        # LLM 认为不需要查资料，直接凭知识回答
-        print("      -> [Researcher] No tool needed, answering from context.")
-        return {"research_info": msg.content}
+        # LLM 认为不需要工具，但仍然要求它搜索（兜底）
+        print("      -> [Researcher] LLM未调用工具，强制要求重新搜索...")
+        # 强制用 DuckDuckGo 搜一次作为兜底
+        try:
+            fallback_result = search_web.invoke({"query": task})
+            final_prompt = f"""
+你是极客科技的情报分析师。
+
+强制搜索结果：
+{fallback_result}
+
+用户问题：{task}
+
+请基于上述搜索结果回答。使用 Markdown 格式。
+"""
+            final_msg = llm.invoke(final_prompt)
+            return {"research_info": final_msg.content}
+        except Exception as e:
+            print(f"      -> [Researcher] 兜底搜索也失败了: {e}")
+            return {"research_info": msg.content}
