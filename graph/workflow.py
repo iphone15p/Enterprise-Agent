@@ -89,12 +89,26 @@ def chat_rag_node(state: AgentState) -> dict:
 
 
 def execute_node(state: AgentState) -> dict:
-    """Execute code produced by the coder agent in a sandbox."""
+    """Execute code produced by the coder agent in a sandbox.
+    Auto-strips markdown code fences and increments retry counter."""
     code = state.get("code", "")
     if not code:
         return {"execution_result": "Error: No code to execute."}
+
+    # Strip markdown code block markers (coder often wraps code in ```python ... ```)
+    code = code.strip()
+    if code.startswith("```"):
+        lines = code.split("\n")
+        # Remove first line (```python or ```) and last line (```)
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        code = "\n".join(lines)
+
     result = run_code_safely(code)
-    return {"execution_result": result}
+    retry_count = state.get("retry_count", 0) + 1
+    return {"execution_result": result, "retry_count": retry_count}
 
 
 def review_decision(state: AgentState) -> Literal["code_node", "__end__"]:

@@ -23,8 +23,8 @@ def code_node(state: dict):
 
 请开始编写完整的 Python 代码。
 要求：
-1. 只输出代码，不要任何解释。
-2. 必须用 ```python 和 ``` 包裹代码。
+1. 只输出纯 Python 代码，不要任何解释。
+2. 严禁使用 Markdown 代码块标记（不要用 ```python 或 ``` 包裹）。
 """
 
     response = llm.invoke(prompt)
