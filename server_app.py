@@ -1,49 +1,116 @@
+# 强制销毁缓存重构 2026
 print("================ 我是真正的 server_app.py！我被执行了！================")
-from fastapi import FastAPI
-# 1. 实例化一个 FastAPI 房子（后端服务器）
-app = FastAPI()
-from fastapi.responses import StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
+
 import json
 import asyncio
-from graph.workflow import agent_executor
+import sqlite3
+import os
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
+# 🌟 核心导入线：把 workflow 编译出来的核心大脑拿过来用
+from graph.workflow import app_graph
 
+# 🌟 新增：如果不存在 data 文件夹，就自动创建一个
+os.makedirs("data", exist_ok=True)
 
+# 🌟 修改路径：把原本的 "history_messages.sqlite3" 全部改到 data 文件夹里
+DB_PATH = "data/history_messages.sqlite3"
 
-# 2. 核心知识点：配置跨域 (CORS)
-# 因为等会儿我们的前端 HTML 网页和后端不在同一个端口，默认会被浏览器拦截。
-# 加上这段代码，就是给服务器发了一张“通行证”，允许任何前端来访问我们。
+# 自动创建一张只存纯文本的极轻量聊天记录表
+with sqlite3.connect(DB_PATH) as conn:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS ui_chat_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            thread_id TEXT,
+            role TEXT,
+            content TEXT
+        )
+    """)
+# 1. 实例化一个 FastAPI 房子
+app = FastAPI()
+
+# 2. 签发 CORS 跨域通行证
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-# 3. 核心知识点：生成器函数 (yield)
-async def event_stream(task: str):
-    """
-    这个函数负责盯着 AI 团队，他们每做完一步，就立刻把数据“吐”给前端
-    """
-    inputs = {"task": task}
-    config = {"recursion_limit": 10}  # 依然保留我们的防破产机制
-
-    # agent_executor.stream 会一步步产出结果
-    for step in agent_executor.stream(inputs, config=config):
-        # 【重点】SSE 协议规定，流式数据必须以 "data: " 开头，以 "\n\n" 结尾！
-        # 我们把字典转换成 JSON 字符串传输出去
-        yield f"data: {json.dumps(step, ensure_ascii=False)}\n\n"
-        # 稍微停顿0.1秒，防止数据跑得太快，前端渲染卡顿
-        await asyncio.sleep(0.1)
-        # event_stream（负责生产）：里面的 yield 负责把 LangGraph 的每一个状态一节一节地切出来。
-    # 当全部执行完毕后，给前端发送一个暗号 "[DONE]"，告诉它结束了
-    yield f"data: [DONE]\n\n"
+MY_SECRET_TOKEN = "dq67_nb_888"
 
 
-# 4. 开放一扇 API 大门，提供给前端调用
+# 3. 根目录路由
+@app.get("/")
+async def serve_frontend():
+    return FileResponse("frontend/index.html")
+
+
+# 4. 运行 Agent 的主接口
 @app.get("/run_agent")
-async def run_agent(task: str = "写一个输出 Hello World 的 Python 脚本"):
-    # 当有人访问 /run_agent 时，返回我们上面写的流式数据
-    return StreamingResponse(event_stream(task), media_type="text/event-stream")
+async def run_agent(
+        task: str = Query("写一个获取今天国内实时热点新闻的 Python 爬虫..."),
+        token: str = Query(None),
+        thread_id: str = Query("default_thread")
+):
+    if token != MY_SECRET_TOKEN:
+        raise HTTPException(status_code=401, detail="🚨 密码错误！")
+
+    # 🌟【保存逻辑 1】：用户一说话，立刻把用户的问题存入 SQL 历史表
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT INTO ui_chat_history (thread_id, role, content) VALUES (?, ?, ?)",
+            (thread_id, "user", task)
+        )
+
+    async def event_stream(current_task: str, current_thread_id: str):
+        inputs = {"task": current_task}
+
+        # 🌟 强行锁死 thread_id！不管前端怎么乱传时间戳，我们在后端都认准这一个记忆库！
+        config = {
+            "recursion_limit": 10,
+            # ✅ 新代码：让大模型的上下文记忆与前端的侧边栏窗口完全一一对应
+            "configurable": {"thread_id": current_thread_id}  # 👈 直接写死它！
+        }
+
+        final_answer = "" # 🌟【新增】：初始化一个变量，用来装 AI 最终吐出的完整回答
+
+        # 🌟 这里正在使用的就是上面导入的 agent_executor，绝对不会再报未定义了！
+        for step in app_graph.stream(inputs, config=config):
+            # 🌟 新增：拦截并偷看大模型到底传回了什么数据！
+            print(f"\n📦 抓包偷看最终数据: {step}")
+
+            # 🌟【保存逻辑 2】：在流式输出过程中，动态拦截并抓取 AI 的最终研究结论
+            for node_name, node_data in step.items():
+                if isinstance(node_data, dict) and "research_info" in node_data:
+                    final_answer = node_data["research_info"] # 抓到了就更新给变量
+
+            yield f"data: {json.dumps(step, ensure_ascii=False)}\n\n"
+            await asyncio.sleep(0.1)
+
+        # 🌟【保存逻辑 3】：当整个 Agent 工作流全部迭代完毕后，把抓到的最终回答砸进数据库
+        if final_answer:
+            with sqlite3.connect(DB_PATH) as conn:
+                conn.execute(
+                    "INSERT INTO ui_chat_history (thread_id, role, content) VALUES (?, ?, ?)",
+                    (current_thread_id, "assistant", final_answer)
+                )
+
+        yield f"data: [DONE]\n\n"
+
+    return StreamingResponse(event_stream(task, thread_id), media_type="text/event-stream")
+
+
+@app.get("/get_chat_history")
+async def get_chat_history(thread_id: str):
+    # 🌟【已修复】：把原先硬编码的 "history_messages.sqlite3" 替换为统一的变量 DB_PATH
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.execute(
+            "SELECT role, content FROM ui_chat_history WHERE thread_id = ? ORDER BY id ASC",
+            (thread_id,)
+        )
+        rows = cursor.fetchall()
+
+    return {"history": [{"role": r, "content": c} for r, c in rows]}

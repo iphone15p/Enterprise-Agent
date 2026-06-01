@@ -1,4 +1,16 @@
+# 1. 绝对机密（防盗刷）
 .env
+
+# 2. Python 运行环境与缓存（体积巨大，毫无用处）
+.venv/
 __pycache__/
 *.pyc
-.venv/
+
+# 3. 向量数据库缓存（几十上百MB，绝对不能传网盘/GitHub）
+chroma_db/
+
+# 4. 重点来了！AI 自动生成的垃圾区（隐身术）
+workspace/
+
+# 5. 运行时数据
+data/

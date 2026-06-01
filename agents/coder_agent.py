@@ -10,16 +10,22 @@ llm = ChatOpenAI(
 
 
 def code_node(state: dict):
-    plan = state["plan"]
-    # 尝试从状态里拿“测试反馈”（第一遍写代码时是没有反馈的）
-    feedback = state.get("feedback", "")
+    print("\n[开发专员 Coder] 💻 正在根据计划和查阅的资料编写代码...")
 
-    if feedback and feedback != "PASS":
-        print("[程序员 Coder] 😭 收到 Bug 反馈，正在痛苦地修改代码...")
-        prompt = f"你之前写的代码有 Bug！请根据测试员的反馈进行修改。\n原始计划：{plan}\n测试反馈：{feedback}\n请直接输出修改后的完整 Python 代码。"
-    else:
-        print("[程序员 Coder] 👨‍💻 收到项目经理的计划，正在狂敲代码...")
-        prompt = f"你是一个高级程序员。请严格按照以下计划，写出具体的 Python 代码：\n计划：{plan}\n注意：只输出代码块，不要加多余的解释。"
+    # 【核心修改】：把 research_info 塞给 Coder
+    prompt = f"""你是一个顶级的 Python 程序员。
+
+用户需求: {state["task"]}
+架构师的计划: {state["plan"]}
+
+【联网调研资料】(如果有报错重试，请参考这里的最新API):
+{state.get("research_info", "无附加资料")}
+
+请开始编写完整的 Python 代码。
+要求：
+1. 只输出代码，不要任何解释。
+2. 必须用 ```python 和 ``` 包裹代码。
+"""
 
     response = llm.invoke(prompt)
     return {"code": response.content}

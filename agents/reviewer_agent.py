@@ -9,23 +9,27 @@ llm = ChatOpenAI(
 )
 
 
+# (在你的 review_node 函数里，修改调用大模型的提示词部分，类似下面这样：)
+
+# 注意：保留你原本文件最上方的 import 和 llm 配置代码
+# 只替换 review_node 这个函数即可
+
 def review_node(state: dict):
-    # 【新增核心逻辑】：如果白板上已经有 feedback，说明程序员已经苦逼地重写过一次了
-    if state.get("feedback"):
-        print("[测试员 Reviewer] 🙄 算了，看你改过一次了，勉强让你过吧！准许交付！")
+    print("\n[审查专员 Reviewer] 🕵️ 正在检查代码和运行结果...")
+
+    exec_result = state.get("execution_result", "")
+
+    # 【终极防卡死补丁】：只要包含"✅ 运行成功"，直接绕过大模型，强制绿灯！
+    if "✅ 运行成功" in exec_result:
+        print("      -> 🚀 代码已成功运行，强制亮起绿灯！进入保存流程！")
         return {"feedback": "PASS"}
 
-    print("[测试员 Reviewer] 🧐 拿到初版代码，正在进行严苛审查...")
-    code = state["code"]
+    prompt = f"""你是一个严厉的代码审查员。
+代码运行报错了：
+{exec_result}
 
-    prompt = f"你是一个极其严苛的测试工程师。请检查以下 Python 代码是否有明显的语法错误。\n代码：{code}\n如果代码没问题，请务必仅回复 'PASS'。如果有问题，请用一句话指出。"
+请结合用户需求：{state.get("task", "")}
+分析这段错误，给出修改建议，让程序员重写。不要输出代码，只说原因。"""
 
     response = llm.invoke(prompt)
-    feedback = response.content.strip()
-
-    # 强制找茬彩蛋
-    if feedback == "PASS":
-        feedback = "代码看起来太简单了，缺少详细的中文注释，打回测试！"
-
-    print(f"[测试员 Reviewer] ❌ 发现问题，打回重写！原因：{feedback}")
-    return {"feedback": feedback}
+    return {"feedback": response.content}
