@@ -183,3 +183,9 @@ async def get_chat_history(thread_id: str):
 DIST_ASSETS = "frontend/dist/assets"
 if os.path.exists(DIST_ASSETS):
     app.mount("/assets", StaticFiles(directory=DIST_ASSETS), name="assets")
+
+
+# ==================== 简单启动方式 ====================
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=7860)
