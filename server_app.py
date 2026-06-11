@@ -38,6 +38,10 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+# 假设你的 app = FastAPI(...) 已经写好了
+# 在代码的靠后位置，强行把 frontend/dist 目录作为网页根目录挂载出去
+app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="frontend")
+
 from pydantic import BaseModel
 
 from graph.workflow import app_graph   # 👈 导入编译好的 LangGraph 工作流
