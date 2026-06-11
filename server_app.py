@@ -40,7 +40,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 # 假设你的 app = FastAPI(...) 已经写好了
 # 在代码的靠后位置，强行把 frontend/dist 目录作为网页根目录挂载出去
-app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="frontend")
+# app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="frontend")
 
 from pydantic import BaseModel
 
@@ -186,8 +186,8 @@ async def get_chat_history(thread_id: str):
 # 必须在所有路由之后 mount，否则会拦截 API 请求
 DIST_ASSETS = "frontend/dist/assets"
 if os.path.exists(DIST_ASSETS):
-    app.mount("/assets", StaticFiles(directory=DIST_ASSETS), name="assets")
-
+    # app.mount("/assets", StaticFiles(directory=DIST_ASSETS), name="assets")
+    app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="frontend")
 
 # ==================== 简单启动方式 ====================
 if __name__ == "__main__":
