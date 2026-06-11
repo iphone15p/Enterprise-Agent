@@ -107,7 +107,7 @@ async def serve_frontend():
 # ==================== 路由 2：运行 Agent（核心接口） ====================
 # DP: 从 @app.get 改为 @app.post，用 JSON Body 传参
 
-@app.post("/run_agent")
+@app.post("/agentrun")
 async def run_agent(req: AgentRequest):
     """
     接收用户任务，流式返回 Agent 管线每一步的输出。

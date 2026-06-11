@@ -42,7 +42,7 @@ export default function App() {
     setChatHistory(prev => [...prev, aiMsg]);
 
     try {
-      const res = await fetch('/run_agent', {
+      const res = await fetch('/agentrun', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ task: text, token: AUTH_TOKEN, thread_id: currentId }),
