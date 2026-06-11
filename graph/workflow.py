@@ -65,20 +65,11 @@ class AgentState(TypedDict, total=False):
 
 # ==================== LLM 实例 ====================
 # 使用阿里云 DashScope 的通义千问（qwen-plus），通过 OpenAI 兼容接口调用
-
-# llm = ChatOpenAI(
-#     api_key=settings.API_KEY,       # 从 .env 读取
-#     base_url=settings.BASE_URL,     # DashScope 兼容端点
-#     model=settings.MODEL_NAME,      # 默认 qwen-turbo
-#     temperature=0.7
-# )
-import os
-
 llm = ChatOpenAI(
-    model="qwen-turbo",
-    api_key=os.environ.get("DASHSCOPE_API_KEY"),
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-    temperature=0.7  # 如果你原来有 temperature 等参数，可以保留
+    model=settings.MODEL_NAME,      # 从 .env 读取模型名
+    api_key=settings.API_KEY,       # 从 .env 读取 API Key
+    base_url=settings.BASE_URL,     # 从 .env 读取端点地址
+    temperature=0.7                 # 控制输出随机性
 )
 
 # ==================== ① 路由裁判 ====================

@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/run_agent': 'http://localhost:8000', // 开发时代理到后端
+      '/agentrun': 'http://localhost:7860', // 开发时代理到后端
       '/get_chat_history': 'http://localhost:8000'
     }
   }

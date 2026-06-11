@@ -7,7 +7,7 @@ function renderMarkdown(text) {
   return DOMPurify.sanitize(marked.parse(text));
 }
 
-// DP: 流式打字机效果 — 首帧100字，之后6字/30ms
+// DP: 流式打字机效果 — 首帧3字，之后2字/50ms（有可见的逐字输出感）
 function useTypewriter(text, isStreaming) {
   const [displayed, setDisplayed] = useState('');
   const timerRef = useRef(null);
@@ -25,11 +25,11 @@ function useTypewriter(text, isStreaming) {
         clearInterval(timerRef.current);
         return;
       }
-      idx += firstFrame.current ? 100 : 6;
+      idx += firstFrame.current ? 3 : 2;     // 首帧3字，之后每帧2字
       firstFrame.current = false;
       if (idx > text.length) idx = text.length;
       setDisplayed(text.substring(0, idx));
-    }, 30);
+    }, 50);                                     // 每50ms一帧
 
     return () => clearInterval(timerRef.current);
   }, [text, isStreaming]);
